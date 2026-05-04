@@ -1,66 +1,60 @@
 # compose
 
-A campaign-generation prototype for the Disco take-home. Advertiser describes their business in one line; the system streams back a ranked publisher list, persona-tuned creatives, and a machine-readable campaign config — with reasoning visible at every step.
-
 ## What I built
 
-A 6-stage pipeline behind a streaming React UI. Backend is FastAPI with native SSE (FastAPI ≥0.135); frontend is React 19 + Vite + Tailwind + Motion. Provider-agnostic LLM caller (OpenAI default, Anthropic fallback).
-
-**The triangle.** Three edges connect *advertiser*, *publisher*, *persona*. Two are scored at request time by LLM (adv↔pub, adv↔persona); the third (pub↔persona) is precomputed at build time into a 200-cell `affinity.json`. Stage 4 joins all three — top pubs enriched with the personas they reach, top personas enriched with the pubs that reach them. The split is the architectural bet: the slowest leg (catalog × catalog) is cached forever; only the brand-specific judgment hits the model live.
-
-**Panels — algorithm in one line each:**
-
-- **Campaign Brief** — one LLM call extracts a structured `CanonicalBrief`; bails to clarifying questions if `confidence == "low"`, saving ~30 LLM calls.
-- **Selected Publishers** — 20 parallel LLM calls score each pub on 4 components, 3 more by rule (economic, reach, geo); weighted into `final_score`. Top K (3/4/5 by confidence) shown; rest collapse into a "silent middle" expand.
-- **Excluded Publishers** — pubs that crossed `risk > T_risk` OR `final_score < T_score` (both T's are confidence-driven). Empty bucket renders a dynamic explanation using the gates that actually ran.
-- **Selected Personas** — 10 parallel LLM calls, same per-component shape, 5 components. Top K shown.
-- **Persona × Publisher Reach** — `joint_score = pub_fit × precomputed_affinity`, rendered as a matrix with intensity dots. This is the third edge of the triangle made visible.
-- **Persona-Tuned Creatives** — one LLM call per top persona; emits headline, body, CTA, reasoning. Reason ordering is intentional: BEFORE-each-score in fit panels (reasoning shapes the number); AFTER for creatives (reasoning explains the choice).
-- **Campaign Config** — pure rule-based, no LLM. Budget = `fit × log10(reach)` normalized across selected pubs; bid strategy from a `(price_tier, business_model)` lookup table.
+compose takes a one-line advertiser brief and gives you back the publishers worth running on, the shopper personas worth talking to, ad copy written for each persona, and a campaign config. Every score comes with a reason, so you can argue with it instead of trusting a black box.
 
 ## How to run
 
+**Live demo:** `https://disco-production-6f42.up.railway.app/` — gated by HTTP Basic Auth, credentials shared separately.
+
+**Run it locally:** create `backend/.env` with at minimum `ANTHROPIC_API_KEY=sk-ant-...` (or `OPENAI_API_KEY=sk-...` to use the OpenAI path). Optional: `LLM_PROVIDER` (defaults to `anthropic`, falls back to whichever key is set), and `AUTH_USERNAME` + `AUTH_PASSWORD` to enable the Basic Auth gate (leave both unset for open local dev).
+
 ```bash
 # backend
-cd backend
-python -m venv venv && source venv/bin/activate
+cd backend && python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-echo "OPENAI_API_KEY=sk-..." > .env   # or ANTHROPIC_API_KEY
 uvicorn app.main:app --port 8000
 
-# frontend (in another terminal)
-cd frontend
-npm install && npm run dev            # → http://localhost:5173
+# frontend (separate terminal)
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-Vite proxies `/campaign` and `/healthz` to `:8000`. Set `VITE_USE_MOCK=true` to drive the UI from local fixtures without burning LLM credits.
+Vite proxies `/campaign` and `/healthz` to `:8000`. Set `VITE_USE_MOCK=true` in `frontend/.env.local` to drive the UI off local fixtures without burning LLM credits.
 
-## What I'd do next with another week
+## Algorithm
 
-- **Response cache** keyed on (prompt-hash, brief-hash, catalog-version) — cuts iteration cost ~80%.
-- **Real eval set**: 30 briefs with expected top-3 pubs + creative spot-checks; run on every prompt change.
-- **Two-pass scoring** for catalog scaling: cheap model bulk-scores all 20 pubs, expensive model only re-scores the top 8 with reasoning. Same UI, ~half the cost at 20 pubs, sublinear at 200.
-- **Move affinity to request-time** with a vector cache so editing personas/publishers doesn't require rerunning the setup script.
-- **Auth + history** (currently rate-limit-only). Saves campaigns, lets the marketer iterate on the same brief across sessions.
+Behind the scenes, the model is a **triangle**: how well the brand fits each publisher, how well it resonates with each shopper persona, and which personas actually read which publishers. The first two depend on the brief and are figured out per request; the third only depends on the catalog, so it's precomputed once and reused.
+
+The pipeline runs in six stages:
+
+1. **Read the brief.** Pull out what the brand actually is category, audience, price tier, tone. If the brief is too vague, ask follow-up questions instead of guessing.
+2. **Rank publishers.** For each publisher, judge fit on category, audience, tone, risk, income match, reach, and geo.
+3. **Rank personas.** Same idea does this brand resonate with this kind of shopper?
+4. **Combine.** Pick the strongest publishers and personas, then map which personas actually live on which publishers.
+5. **Write the ads.** One headline and body and CTA per selected persona, written for them specifically.
+6. **Assemble the config.** Split the budget across publishers (more reach and better fit gets a bigger share), pick a bid strategy, and produce the final campaign config. (Assumed budget as 50,000$ and split it across as percentage share)
+
+## What I'd do next
+
+1. **Reduce LLM dependency.** Today the LLM rescores every publisher and persona on every request. With another week a cheap similarity check would shortlist candidates first, and the LLM would only step in for the survivors and the ad copy. Almost ~80% cost cut and this scales the catalog from 20 to 1000+.
+2. **Build an eval set.** Today every prompt change is a guess. There is no way to tell if a tweak helped or hurt the rankings. With another week I would hand label around 30 briefs with their expected top 3 publishers and run them automatically on every change. This will help me catch any regression.
 
 ## What I intentionally cut
 
-- **No DB.** Stateless service. Persisting briefs/runs is infra weight without being asked for.
-- **No `frequency_cap` or `pacing` in CampaignConfig.** Real ad-ops concepts but not in `GLOSSARY.md` — vocabulary creep.
-- **No multi-tenant auth.** Rate-limit per IP (5 req / 30s) + provider spend cap is enough demo protection.
-- **No DSP wire-up.** Assignment asks for the *config*; actually buying media is out of scope.
-- **One creative per persona, not N variants × persona.** Spec says 3–5 creatives total.
-- **No streaming-token UX inside a stage.** Stages emit complete payloads, not partial tokens — keeps the protocol simple, the UI honest, and parsers cheap.
+The aim was to focus on the core algorithm and prove the approach works. To do this, I broke the process into atomic stages and pulled every lerned parameters value into a hyperparameters file, so tomorrow when there is real data, these values can be replaced with from a trained ML or DL model.
 
-## Hard vs. easy, and where the interesting work lives
+Two things this meant cutting for now.
 
-**Easy.** Rule-based combination (Stage 4) and config assembly (Stage 6) are dict-lookups once you've decided the formula. SSE plumbing is one decorator with FastAPI's native `EventSourceResponse`. Card UIs and animations are well-paved territory.
+1. **Production grade backend and frontend.** No async queue, no retries on LLM calls, no structured tracing. The system runs cleanly for one user at low concurrency. A real deployment needs queue-based processing so a long brief survives a closed browser, plus observability and retries for network failures. Cut to keep the time on algorithm depth.
+2. **Learned weights instead of hand-tuned ones.** Several formulas use weights I picked by intuition. How much category overlap counts versus audience overlap. Where to flag a publisher as too risky. Where reach saturation kicks in. They live in a hyperparameters file by design so a ML/DL model can replace them later. These values will e determined when I have access to actual data and outcome data .
 
-**Hard.**
+## What's hard, what's easy, and where the interesting work lives
 
-1. **Designing the score formula itself.** Picking the 7 components, assigning weights, handling out-of-distribution inputs. The original `economic_fit` was binary "in expected income_tier set → 1.0" and saturated at 1.0 across most pubs — killing the signal. Replaced with continuous distance from a single ideal rank. Easy to write code; hard to write a *defensible* formula.
-2. **Output ordering for autoregressive reasoning.** Per-component reason BEFORE its score, `overall_thought` LAST. Get this wrong and the model justifies a number it's already committed to. This is a real shaping lever, not a stylistic choice.
-3. **Confidence end-to-end.** Low-confidence brief bails at Stage 1; medium widens K, loosens exclusion gates; high tightens both. The frontend reads the *actual gates that ran* and explains the resulting empty-state ("no pub crossed score 0.15 or risk 0.70 for this medium-confidence brief") — instead of staring at a blank panel and assuming the system broke.
-4. **The empty-state honesty problem.** Easy fix: force bottom-5 into the "excluded" bucket so the panel always has content. Right fix: explain *why* a bucket is empty using real numbers. The empty bucket is a signal, not a UI bug.
+The easy part was the generative part. Writing prompts for headlines, body copy, and CTAs. LLMs are genuinely excellent at this when given the right context. Get a tight brief, the right persona, the right tone, and the model will write you something good.
 
-**Where the interesting engineering lives.** The whole system is a tradeoff between *cost* (LLM calls), *freshness* (every request hits the model), and *trust* (user needs to see WHY, not just WHAT). The triangle-fit architecture is how I made the tradeoff: adv↔pub and adv↔persona via LLM at request time (brand-specific, can't precompute), pub↔persona precomputed at build time (catalog × catalog, stable). Build-time affinity caches the slowest leg; request-time LLM does the judgment that can't be cached. That's the architectural bet — and it's what makes the per-request math fast enough to stream stage-by-stage instead of "loading…" for a minute.
+The hard part is gathering that "right context". Which publishers are worth considering, which personas actually fit this brand, which combination of those two should the headline and content be written for. This is the recommendation layer, and it is where the real engineering lives. The LLM at the end is doing the easy job. Everything before it is what makes the output worth reading.
+
+At scale this gets harder still. The publisher and persona scorers would need to be trained from real outcome data instead of called fresh from an LLM every request. The publisher and persona affinity matrix cannot be precomputed for a million by million catalog and would need clustering or on demand computation. And the LLM steps that stay, reading the brief and writing the creative, cost too much at API rates at volume, so a self-hosted or fine-tuned model becomes necessary.
+
+That is the bet behind the triangle structure and the atomic stages. Not because pipelines are easier to implement, but because every layer that narrows the candidate set before the LLM sees it is where the system earns its quality, and every layer is also where it can be replaced with something cheaper as scale demands.
