@@ -1,14 +1,17 @@
 import asyncio
 import logging
+import os
 import secrets
 from collections.abc import AsyncIterable
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.sse import EventSourceResponse, ServerSentEvent
+from fastapi.staticfiles import StaticFiles
 
 # Configure root logging once for the whole app.
 logging.basicConfig(
@@ -144,3 +147,23 @@ async def campaign(
             yield ServerSentEvent(event=ev["type"], data=ev)
     finally:
         await producer_task
+
+
+# Serve the built frontend (production). In dev the directory does not exist
+# and we skip the mount; Vite handles the UI on its own port.
+# STATIC_DIR can be overridden via env, otherwise defaults to ../static relative
+# to the backend (matches the Dockerfile layout).
+_STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
+if _STATIC_DIR.is_dir():
+    # SPA fallback: any unknown GET path returns index.html so client-side routes work.
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        target = _STATIC_DIR / full_path
+        if full_path and target.is_file():
+            return FileResponse(target)
+        return FileResponse(_STATIC_DIR / "index.html")
+
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
+    logger.info("serving frontend from %s", _STATIC_DIR)
+else:
+    logger.info("no static dir at %s, frontend served separately", _STATIC_DIR)
