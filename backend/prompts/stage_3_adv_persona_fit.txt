@@ -56,7 +56,7 @@ disinterest
 - Use the brief's product_or_service and proof_or_features as background context for every component. A category match means more when you know what the actual product is.
 - Score each dimension independently. A high category match does not raise audience or tone.
 - Use only the brief and persona content given. Do not invent traits.
-- Keep each *_reason to one short sentence. State which fields you matched.
+- Keep each *_reason to one short sentence. Name what is specifically distinctive about THIS persona that drove the score (use the persona's own vocabulary from description, category_affinities, messaging_preferences, and disinterested_in). Do NOT quote or paraphrase the brief's `target_customer`, `tone`, or `positioning` strings back; the reviewer is comparing reasons across many personas and needs each one to read differently.
 - Do not output any text outside the JSON object.
 - Numbers must be floats with one or two decimals. Do not return integers, percentages, or strings.
 - overall_thought is the LAST field. Write it after committing all per-component scores.
@@ -109,5 +109,5 @@ typical_aov_usd: 65
 </persona>
 
 Output:
-{"scores":{"category_reason":"persona's specialty_coffee and craft_food affinities directly map to brief's cold_brew and premium beverage signals","category":0.92,"audience_reason":"persona's deliberate design-conscious 30-45 buyer matches the brief's target_customer description almost exactly","audience":0.93,"tone_reason":"persona's preference for provenance, craftsmanship, and design-forward messaging directly aligns with brief's thoughtful and design-forward tone","tone":0.90,"disinterest_reason":"brief's premium-craft positioning carries no mass-market, loud promo, or hype signals that would conflict with persona's disinterests","disinterest":0.05},"overall_thought":"The Urban Craft Enthusiast is a near-ideal match for an artisan cold brew brand: category, audience profile, tone preferences, and disinterest profile all align without significant gaps. This persona should be a primary creative target."}
+{"scores":{"category_reason":"specialty_coffee and craft_food affinities sit directly inside the artisan-beverage adjacency","category":0.92,"audience_reason":"deliberate slow-decision buyer of independent makers, with low price sensitivity and a 65 typical AOV","audience":0.93,"tone_reason":"provenance, craftsmanship, and materials-transparency preferences map onto an 18-hour single-origin story","tone":0.90,"disinterest_reason":"no mass-market, loud-promo, or hype-drop signals present in the brand to trigger this persona's avoidance list","disinterest":0.05},"overall_thought":"The Urban Craft Enthusiast is a near-ideal match for an artisan cold brew brand: category, audience profile, tone preferences, and disinterest profile all align without significant gaps. This persona should be a primary creative target."}
 </example>

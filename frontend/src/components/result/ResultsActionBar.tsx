@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
-import type { CampaignConfig } from "../../types";
 import { cn } from "../../lib/utils";
 
 interface ResultsActionBarProps {
-  config: CampaignConfig;
   onReset: () => void;
 }
 
-export function ResultsActionBar({ config, onReset }: ResultsActionBarProps) {
-  const [copied, setCopied] = useState(false);
+export function ResultsActionBar({ onReset }: ResultsActionBarProps) {
   const [scrolled, setScrolled] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -25,16 +22,6 @@ export function ResultsActionBar({ config, onReset }: ResultsActionBarProps) {
     obs.observe(sentinel);
     return () => obs.disconnect();
   }, []);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard may be blocked; silently fail — the JSON is still visible in the panel.
-    }
-  }
 
   return (
     <>
@@ -54,48 +41,22 @@ export function ResultsActionBar({ config, onReset }: ResultsActionBarProps) {
           Your campaign
         </span>
 
-        <div className="flex items-center gap-2.5">
-          <motion.button
-            type="button"
-            onClick={handleCopy}
-            whileTap={{ scale: 0.97 }}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-pill px-4 py-2 text-[13px] font-medium transition-colors duration-200",
-              copied
-                ? "bg-[#E8F7EF] text-[#1B7A3F] border border-[#1B7A3F]/20"
-                : "bg-canvas-raised text-ink border border-line hover:border-ink-subtle"
-            )}
+        <motion.button
+          type="button"
+          onClick={onReset}
+          whileTap={{ scale: 0.97 }}
+          whileHover="hover"
+          className="group inline-flex items-center gap-2 rounded-pill bg-brand-gradient text-white px-4 py-2 text-[13px] font-semibold shadow-brand hover:shadow-brand-strong transition-shadow duration-200"
+        >
+          Try another brief
+          <motion.span
+            variants={{ hover: { x: 3 } }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            className="inline-flex"
           >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5" strokeWidth={2.75} />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" strokeWidth={2} />
-                Copy config as JSON
-              </>
-            )}
-          </motion.button>
-
-          <motion.button
-            type="button"
-            onClick={onReset}
-            whileTap={{ scale: 0.97 }}
-            whileHover="hover"
-            className="group inline-flex items-center gap-2 rounded-pill bg-brand-gradient text-white px-4 py-2 text-[13px] font-semibold shadow-brand hover:shadow-brand-strong transition-shadow duration-200"
-          >
-            Try another brief
-            <motion.span
-              variants={{ hover: { x: 3 } }}
-              transition={{ type: "spring", stiffness: 400, damping: 28 }}
-              className="inline-flex"
-            >
-              <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.75} />
-            </motion.span>
-          </motion.button>
-        </div>
+            <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.75} />
+          </motion.span>
+        </motion.button>
       </div>
     </>
   );

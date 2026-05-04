@@ -36,7 +36,7 @@ export function ResultsView({ state, onReset }: ResultsViewProps) {
       }}
       className="flex flex-col gap-5"
     >
-      <ResultsActionBar config={config} onReset={onReset} />
+      <ResultsActionBar onReset={onReset} />
       <BriefDetail brief={brief} />
       <MatchQualityBanner
         quality={recommendation.match_quality}

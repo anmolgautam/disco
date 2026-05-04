@@ -56,7 +56,7 @@ risk
 - Use the brief's product_or_service and proof_or_features as background context for every component. A category match means more when you know what the actual product is.
 - Score each dimension independently. A high category match does not raise audience or tone.
 - Use only the brief and publisher content given. Do not invent traits.
-- Keep each *_reason to one short sentence. State which fields you matched.
+- Keep each *_reason to one short sentence. Name what is specifically distinctive about THIS publisher that drove the score (use the publisher's own vocabulary from category, subcategories, audience fields, and notes). Do NOT quote or paraphrase the brief's `target_customer`, `tone`, or `positioning` strings back; the reviewer is comparing reasons across many publishers and needs each one to read differently.
 - Do not output any text outside the JSON object.
 - Numbers must be floats with one or two decimals. Do not return integers, percentages, or strings.
 - overall_thought is the LAST field. Write it after committing all per-component scores.
@@ -105,5 +105,5 @@ notes: Long-form gear reviews, repeat readers, premium expedition brands feature
 </publisher>
 
 Output:
-{"scores":{"category_reason":"publisher is outdoor/hiking; brief is beverages/cold_brew with no outdoor or coffee overlap","category":0.10,"audience_reason":"both target premium 30-50 professionals but publisher's outdoor-research framing doesn't match design-conscious craft buyers","audience":0.40,"tone_reason":"publisher's long-form considered editorial voice partially supports thoughtful and design-forward tone","tone":0.55,"risk_reason":"publisher is premium long-form, no mass-market deal voice, no obvious conflict with brief constraints","risk":0.10},"overall_thought":"TrailHaus has a high-income premium-positioned audience that matches the brief's price tier and tone, but the category mismatch is fundamental — outdoor-gear readers are not the natural buyer for cold brew coffee. Tone partially aligns. Risk is low. Net: weak fit driven by category."}
+{"scores":{"category_reason":"hiking and camping gear-review publisher; no beverage or coffee subcategories present","category":0.10,"audience_reason":"long-form gear-review readership skews trail-utility purchase intent rather than design or craft purchase intent","audience":0.40,"tone_reason":"considered long-form editorial voice with expedition-brand framing reads as functional rather than design-forward","tone":0.55,"risk_reason":"premium long-form environment with no impulse, hype, or mass-market deal patterns","risk":0.10},"overall_thought":"TrailHaus has a high-income premium-positioned audience that matches the brief's price tier and tone, but the category mismatch is fundamental: outdoor-gear readers are not the natural buyer for cold brew coffee. Tone partially aligns. Risk is low. Net: weak fit driven by category."}
 </example>
