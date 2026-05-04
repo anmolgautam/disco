@@ -1,4 +1,11 @@
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env early — config reads env vars at import time, so this must run
+# BEFORE any os.getenv() call. Idempotent with the load_dotenv() in llm_caller.py.
+load_dotenv()
 
 # Filesystem paths
 # Resolved from this file's location so consumers never count directory levels.
@@ -17,7 +24,6 @@ LLM_MAX_TOKENS = 8000
 
 # Per-call retries on JSON or pydantic validation failure.
 MAX_RETRIES = 3
-
 
 
 # Concurrency
@@ -40,3 +46,9 @@ CORS_ALLOW_ORIGINS: list[str] = [
     "http://127.0.0.1:5174",
 ]
 CORS_ALLOW_ORIGIN_REGEX = r"https://.*\.up\.railway\.app"
+
+# Basic Auth. Both env vars must be set to enforce auth (deployment).
+# If either is missing the gate is disabled (local dev convenience).
+AUTH_USERNAME = os.getenv("AUTH_USERNAME")
+AUTH_PASSWORD = os.getenv("AUTH_PASSWORD")
+AUTH_ENABLED = bool(AUTH_USERNAME and AUTH_PASSWORD)

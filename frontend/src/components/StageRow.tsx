@@ -52,7 +52,9 @@ export function StageRow({ stage }: StageRowProps) {
           )}
           {status === "complete" && duration_ms !== undefined && formatDuration(duration_ms)}
           {status === "error" && (
-            <span className="text-red-600">{error ?? "error"}</span>
+            <span className="text-[#B8531A] font-semibold uppercase tracking-[0.12em] text-[11px]">
+              failed
+            </span>
           )}
         </span>
       </div>
@@ -70,6 +72,26 @@ export function StageRow({ stage }: StageRowProps) {
           >
             <div className="pt-3 pb-1">
               <StagePreview stage={stage} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error detail: wraps inside an amber-tinted block instead of overflowing the row */}
+      <AnimatePresence initial={false}>
+        {status === "error" && error && (
+          <motion.div
+            key="error"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2.5 rounded-lg border border-[#F0DEC2] bg-[#FFFBF5] px-3 py-2.5 max-w-full">
+              <p className="text-[12px] font-mono text-[#7A4A1A] leading-snug break-words whitespace-pre-wrap">
+                {error}
+              </p>
             </div>
           </motion.div>
         )}

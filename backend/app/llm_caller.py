@@ -1,4 +1,5 @@
 import os
+
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -39,11 +40,8 @@ else:
     MODEL = LLM_MODEL_OPENAI
 
 
-def call_llm(
-    system_prompt: str,
-    user_input: str,
-    model: str | None = None,
-) -> str:
+def call_llm(system_prompt: str, user_input: str, model: str | None = None) -> str:
+    """Send a prompt and return the raw text response. Caller parses JSON."""
     model = model or MODEL
     if PROVIDER == "anthropic":
         r = _client.messages.create(

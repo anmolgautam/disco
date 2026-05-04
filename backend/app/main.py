@@ -1,10 +1,13 @@
 import asyncio
 import logging
+import secrets
 from collections.abc import AsyncIterable
+from typing import Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 # Configure root logging once for the whole app.
@@ -18,7 +21,14 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.config import CORS_ALLOW_ORIGIN_REGEX, CORS_ALLOW_ORIGINS, RATE_LIMIT
+from app.config import (
+    AUTH_ENABLED,
+    AUTH_PASSWORD,
+    AUTH_USERNAME,
+    CORS_ALLOW_ORIGIN_REGEX,
+    CORS_ALLOW_ORIGINS,
+    RATE_LIMIT,
+)
 from app.pipeline import run_events
 
 logger = logging.getLogger("compose.api")
@@ -48,6 +58,40 @@ async def rate_limit_handler(_request: Request, exc: RateLimitExceeded):
     )
 
 
+# Basic Auth gate. When AUTH_ENABLED is False (env vars unset) the dependency
+# is a no-op, so local dev keeps working without configuring credentials.
+_security = HTTPBasic(auto_error=False)
+
+
+def require_auth(
+    credentials: Annotated[HTTPBasicCredentials | None, Depends(_security)],
+) -> None:
+    if not AUTH_ENABLED:
+        return
+    # Note: WWW-Authenticate: Basic is intentionally omitted. Including it would
+    # trigger the browser's native HTTP-auth prompt on top of our custom UI.
+    # The frontend AuthGate handles 401 itself.
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
+    user_ok = secrets.compare_digest(credentials.username, AUTH_USERNAME or "")
+    pass_ok = secrets.compare_digest(credentials.password, AUTH_PASSWORD or "")
+    if not (user_ok and pass_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+
+
+if not AUTH_ENABLED:
+    logger.warning(
+        "AUTH_USERNAME / AUTH_PASSWORD not set, /campaign is unauthenticated. "
+        "Set both env vars in production.",
+    )
+
+
 class CampaignRequest(BaseModel):
     brief: str = Field(..., min_length=1, max_length=4000)
 
@@ -57,9 +101,19 @@ def healthz():
     return {"status": "ok"}
 
 
+@app.get("/auth/check")
+def auth_check(_: Annotated[None, Depends(require_auth)] = None):
+    """Cheap authenticated GET so the login UI can validate creds before storing them."""
+    return {"ok": True}
+
+
 @app.post("/campaign", response_class=EventSourceResponse)
 @limiter.limit(RATE_LIMIT)
-async def campaign(request: Request, body: CampaignRequest) -> AsyncIterable[ServerSentEvent]:
+async def campaign(
+    request: Request,
+    body: CampaignRequest,
+    _: Annotated[None, Depends(require_auth)] = None,
+) -> AsyncIterable[ServerSentEvent]:
     brief = body.brief.strip()
     logger.info("campaign request received (brief len=%d)", len(brief))
     loop = asyncio.get_running_loop()

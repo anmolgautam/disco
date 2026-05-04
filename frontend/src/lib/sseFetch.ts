@@ -3,6 +3,7 @@
 // we POST and parse `event:` / `data:` frames out of the streamed response.
 
 import type { DoneEvent, StageEvent } from "../types";
+import { clearAuth, getAuthHeader } from "./auth";
 
 export type ServerEvent =
   | { event: "stage"; data: StageEvent }
@@ -13,12 +14,26 @@ export async function* campaignSSE(
   brief: string,
   signal?: AbortSignal
 ): AsyncGenerator<ServerEvent, void, void> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  const auth = getAuthHeader();
+  if (auth) headers.Authorization = auth;
+
   const res = await fetch("/campaign", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers,
     body: JSON.stringify({ brief }),
     signal,
   });
+
+  if (res.status === 401) {
+    // Stale or wrong credentials. Clear and prompt the AuthGate again.
+    clearAuth();
+    window.location.reload();
+    throw new Error("Unauthorized — please sign in again.");
+  }
 
   if (!res.ok) {
     let detail = `${res.status}`;

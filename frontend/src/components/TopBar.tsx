@@ -18,7 +18,7 @@ export function TopBar() {
     <header className="h-16 px-8 flex items-center justify-between border-b border-line/50">
       <Wordmark />
       <a
-        href="https://github.com"
+        href="https://github.com/anmolgautam/disco"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="View source on GitHub"
