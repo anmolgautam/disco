@@ -10,5 +10,6 @@
 !**/.env.example
 .claude
 brainstorming
-assignment
+assignment/*
+!assignment/data
 README.md

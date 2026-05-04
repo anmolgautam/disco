@@ -19,6 +19,8 @@ RUN pip install -r requirements.txt
 
 COPY backend/ ./
 COPY --from=frontend /fe/dist ./static
+# Catalog code resolves to /assignment/data via parent.parent.parent of app/catalog.py.
+COPY assignment/data /assignment/data
 
 # Railway sets PORT; default to 8000 for local docker run.
 ENV PORT=8000
